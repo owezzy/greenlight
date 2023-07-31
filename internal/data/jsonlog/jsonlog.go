@@ -46,7 +46,15 @@ type Logger struct {
 // Return a new Logger instance which writes log entries at or above a minimum severity // level to a specific output destination.
 func New(out io.Writer, minLevel Level) *Logger {
 	return &Logger{out: out,
-		minLevel: minLevel}
+		minLevel: minLevel,
+	}
+}
+
+// Declare some helper methods for writing log entries at the different levels. Notice
+// that these all accept a map as the second parameter which can contain any arbitrary
+// 'properties' that you want to appear in the log entry.
+func (l *Logger) PrintInfo(message string, properties map[string]string) {
+	l.print(LevelInfo, message, properties)
 }
 
 func (l *Logger) PrintError(err error, properties map[string]string) {
