@@ -6,7 +6,7 @@ import (
 	"github.com/julienschmidt/httprouter"
 )
 
-func (app *application) routes() *httprouter.Router { // Initialize a new httprouter router instance.
+func (app *application) routes() http.Handler { // Initialize a new httprouter router instance.
 	router := httprouter.New()
 
 	// Convert the notFoundResponse() helper to a http.Handler using the
@@ -23,5 +23,5 @@ func (app *application) routes() *httprouter.Router { // Initialize a new httpro
 	router.HandlerFunc(http.MethodPatch, "/v1/movies/:id", app.updateMovieHandler)
 	router.HandlerFunc(http.MethodDelete, "/v1/movies/:id", app.deleteMovieHandler)
 	// Return the httprouter instance.
-	return router
+	return app.recoverPanic(router)
 }
