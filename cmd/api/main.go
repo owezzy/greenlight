@@ -105,8 +105,11 @@ func main() {
 		"addr": srv.Addr,
 		"env":  cfg.env,
 	})
-	err = srv.ListenAndServe()
-	logger.PrintFatal(err, nil)
+	// Call app.serve() to start the server.
+	err = app.serve()
+	if err != nil {
+		logger.PrintFatal(err, nil)
+	}
 }
 
 // The openDB() function returns a sql.DB connection pool.
