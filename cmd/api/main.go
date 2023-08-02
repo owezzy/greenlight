@@ -7,11 +7,13 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"sync"
 	"time"
 
 	_ "github.com/lib/pq"
 	"greenlight.owezzy.net/internal/data"
 	"greenlight.owezzy.net/internal/data/jsonlog"
+	"greenlight.owezzy.net/internal/mailer"
 )
 
 // Declare a string containing the application version number.
@@ -35,6 +37,13 @@ type config struct {
 		burst   int
 		enabled bool
 	}
+	smtp struct {
+		host     string
+		port     int
+		username string
+		password string
+		sender   string
+	}
 }
 
 // Define an application struct to hold the dependencies for our HTTP handlers, helpers, and middleware.
@@ -42,6 +51,8 @@ type application struct {
 	config config
 	logger *jsonlog.Logger
 	models data.Models
+	mailer mailer.Mailer
+	wg     sync.WaitGroup
 }
 
 func main() {
@@ -67,6 +78,13 @@ func main() {
 	flag.IntVar(&cfg.limiter.burst, "limiter-burst", 4, "Rate limiter maximum burst")
 	flag.BoolVar(&cfg.limiter.enabled, "limiter-enabled", true, "Enable rate limiter")
 
+	// smtp
+
+	flag.StringVar(&cfg.smtp.host, "smtp-host", "sandbox.smtp.mailtrap.io", "SMTP host")
+	flag.IntVar(&cfg.smtp.port, "smtp-port", 25, "SMTP port")
+	flag.StringVar(&cfg.smtp.username, "smtp-username", "379378cfd4c81d", "SMTP username")
+	flag.StringVar(&cfg.smtp.password, "smtp-password", "dd787d88bb78fc", "SMTP password")
+	flag.StringVar(&cfg.smtp.sender, "smtp-sender", "Greenlight <no-reply@greenlight.owezzytech.net>", "SMTP sender")
 	flag.Parse()
 
 	// Initialize a new jsonlog.Logger which writes any messages *at or above* the INFO
@@ -78,7 +96,8 @@ func main() {
 	}
 
 	defer db.Close()
-	// Also log a message to say that the connection pool has been successfully // established.
+	// Also log a message to say that the connection pool has been successfully
+	// established.
 	logger.PrintInfo("database connection pool established", nil)
 
 	// Declare an instance of the application struct, containing the config struct and  the logger.
@@ -86,6 +105,7 @@ func main() {
 		config: cfg,
 		logger: logger,
 		models: data.NewModels(db),
+		mailer: mailer.New(cfg.smtp.host, cfg.smtp.port, cfg.smtp.username, cfg.smtp.password, cfg.smtp.sender),
 	}
 	// Declare a new servemux and add a /v1/healthcheck route which dispatches requests // to the healthcheckHandler method (which we will create in a moment).
 	mux := http.NewServeMux()
