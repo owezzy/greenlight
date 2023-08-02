@@ -31,6 +31,7 @@ func (app *application) registerUserHandler(w http.ResponseWriter, r *http.Reque
 		Email:     input.Email,
 		Activated: false,
 	}
+
 	// Use the Password.Set() method to generate and store the hashed and plaintext
 	// passwords.
 	err = user.Password.Set(input.Password)
@@ -60,8 +61,19 @@ func (app *application) registerUserHandler(w http.ResponseWriter, r *http.Reque
 		}
 		return
 	}
-	// Write a JSON response containing the user data along with a 201 Created status code.
-	err = app.writeJSON(w, http.StatusCreated, envelope{"user": user}, nil)
+
+	app.background(func() {
+		err = app.mailer.Send(user.Email, "user_welcome.html", user)
+		if err != nil {
+			// Importantly, if there is an error sending the email then we use the
+			// app.logger.PrintError() helper to manage it, instead of the
+			// app.serverErrorResponse() helper like before.
+			app.logger.PrintError(err, nil)
+		}
+	})
+
+	// Note that we also change this to send the client a 202 Accepted status code.
+	err = app.writeJSON(w, http.StatusAccepted, envelope{"user": user}, nil)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 	}

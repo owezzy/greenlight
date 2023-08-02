@@ -8,6 +8,7 @@ require (
 )
 
 require (
+	github.com/go-mail/mail v2.3.1+incompatible
 	github.com/go-mail/mail/v2 v2.3.0 // indirect
 	golang.org/x/crypto v0.11.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
