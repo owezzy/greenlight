@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -43,6 +44,11 @@ type config struct {
 		username string
 		password string
 		sender   string
+	}
+
+	// Add a cors struct and trustedOrigins field with the type []string.
+	cors struct {
+		trustedOrigins []string
 	}
 }
 
@@ -85,6 +91,12 @@ func main() {
 	flag.StringVar(&cfg.smtp.username, "smtp-username", "379378cfd4c81d", "SMTP username")
 	flag.StringVar(&cfg.smtp.password, "smtp-password", "dd787d88bb78fc", "SMTP password")
 	flag.StringVar(&cfg.smtp.sender, "smtp-sender", "Greenlight <no-reply@greenlight.owezzytech.net>", "SMTP sender")
+
+	flag.Func("cors-trusted-origins", "Trusted CORS origins (space separated)", func(val string) error {
+		cfg.cors.trustedOrigins = strings.Fields(val)
+		return nil
+	})
+
 	flag.Parse()
 
 	// Initialize a new jsonlog.Logger which writes any messages *at or above* the INFO
