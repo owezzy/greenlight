@@ -17,10 +17,12 @@ import (
 	"greenlight.owezzy.net/internal/data"
 	"greenlight.owezzy.net/internal/data/jsonlog"
 	"greenlight.owezzy.net/internal/mailer"
+	"greenlight.owezzy.net/internal/vcs"
 )
 
-// Declare a string containing the application version number.
-const version = "1.0.0"
+var (
+	version = vcs.Version()
+)
 
 // Define a config struct to hold all the configuration settings for our application.
 type config struct {
@@ -99,7 +101,15 @@ func main() {
 		return nil
 	})
 
+	displayVersion := flag.Bool("version", false, "Display version and exit")
+
 	flag.Parse()
+
+	// If the version flag value is true, then print out the version number and immediately exit.
+	if *displayVersion {
+		fmt.Printf("Version:\t%s\n", version)
+		os.Exit(0)
+	}
 
 	// Initialize a new jsonlog.Logger which writes any messages *at or above* the INFO
 	// severity level to the standard out stream.

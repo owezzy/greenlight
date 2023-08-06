@@ -2,14 +2,13 @@ package main
 
 import (
 	"errors"
-	"expvar"
 	"fmt"
-	"net"
 	"net/http"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/tomasen/realip"
 
 	"golang.org/x/time/rate"
 	"greenlight.owezzy.net/internal/data"
@@ -71,12 +70,8 @@ func (app *application) rateLimit(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Only carry out the check if rate limiting is enabled.
 		if app.config.limiter.enabled {
-			// Extract the client's IP address from the request.
-			ip, _, err := net.SplitHostPort(r.RemoteAddr)
-			if err != nil {
-				app.serverErrorResponse(w, r, err)
-				return
-			}
+			// Use the realip.FromRequest() function to get the client's real IP address.
+			ip := realip.FromRequest(r)
 
 			// Lock the mutex to prevent this code from being executed concurrently.
 			mu.Lock()
@@ -85,7 +80,8 @@ func (app *application) rateLimit(next http.Handler) http.Handler {
 				clients[ip] = &client{
 					// Use the requests-per-second and burst values from the config
 					// struct.
-					limiter: rate.NewLimiter(rate.Limit(app.config.limiter.rps), app.config.limiter.burst)}
+					limiter: rate.NewLimiter(rate.Limit(app.config.limiter.rps), app.config.limiter.burst),
+				}
 			}
 			// Update the last seen time for the client.
 			clients[ip].lastSeen = time.Now()
@@ -241,6 +237,7 @@ func (app *application) requirePermission(code string, next http.HandlerFunc) ht
 	// Wrap this with the requireActivatedUser() middleware before returning it.
 	return app.requireActivatedUser(fn)
 }
+
 func (app *application) enableCORS(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Add the "Vary: Origin" header.
@@ -283,66 +280,66 @@ func (app *application) enableCORS(next http.Handler) http.Handler {
 	})
 }
 
-type metricsResponseWriter struct {
-	http.ResponseWriter
-	statusCode    int
-	headerWritten bool
-}
+// type metricsResponseWriter struct {
+// 	http.ResponseWriter
+// 	statusCode    int
+// 	headerWritten bool
+// }
 
-func (mw *metricsResponseWriter) WriteHeader(statusCode int) {
-	mw.ResponseWriter.WriteHeader(statusCode)
-	if !mw.headerWritten {
-		mw.statusCode = statusCode
-		mw.headerWritten = true
-	}
-}
+// func (mw *metricsResponseWriter) WriteHeader(statusCode int) {
+// 	mw.ResponseWriter.WriteHeader(statusCode)
+// 	if !mw.headerWritten {
+// 		mw.statusCode = statusCode
+// 		mw.headerWritten = true
+// 	}
+// }
 
-func (mw *metricsResponseWriter) Write(b []byte) (int, error) {
-	if !mw.headerWritten {
-		mw.statusCode = http.StatusOK
-		mw.headerWritten = true
-	}
-	return mw.ResponseWriter.Write(b)
-}
+// func (mw *metricsResponseWriter) Write(b []byte) (int, error) {
+// 	if !mw.headerWritten {
+// 		mw.statusCode = http.StatusOK
+// 		mw.headerWritten = true
+// 	}
+// 	return mw.ResponseWriter.Write(b)
+// }
 
-func (mw *metricsResponseWriter) Unwrap() http.ResponseWriter {
-	return mw.ResponseWriter
-}
+// func (mw *metricsResponseWriter) Unwrap() http.ResponseWriter {
+// 	return mw.ResponseWriter
+// }
 
-func (app *application) metrics(next http.Handler) http.Handler {
-	// Initialize the new expvar variables when the middleware chain is first built.
-	var (
-		totalRequestsReceived           = expvar.NewInt("total_requests_received")
-		totalResponsesSent              = expvar.NewInt("total_responses_sent")
-		totalProcessingTimeMicroseconds = expvar.NewInt("total_processing_time_μs")
-		// Declare a new expvar map to hold the count of responses for each HTTP status code.
-		totalResponsesSentByStatus = expvar.NewMap("total_responses_sent_by_status")
-	)
-	// The following code will be run for every request...
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Record the time that we started to process the request.
-		start := time.Now()
-		// Use the Add() method to increment the number of requests received by 1.
-		totalRequestsReceived.Add(1)
-		// Create a new metricsResponseWriter, which wraps the original
-		// http.ResponseWriter value that the metrics middleware received.
-		mw := &metricsResponseWriter{ResponseWriter: w}
-		// Call the next handler in the chain.
-		next.ServeHTTP(mw, r)
-		// On the way back up the middleware chain, increment the number of responses
-		// sent by 1.
-		totalResponsesSent.Add(1)
+// func (app *application) metrics(next http.Handler) http.Handler {
+// 	// Initialize the new expvar variables when the middleware chain is first built.
+// 	var (
+// 		totalRequestsReceived           = expvar.NewInt("total_requests_received")
+// 		totalResponsesSent              = expvar.NewInt("total_responses_sent")
+// 		totalProcessingTimeMicroseconds = expvar.NewInt("total_processing_time_μs")
+// 		// Declare a new expvar map to hold the count of responses for each HTTP status code.
+// 		totalResponsesSentByStatus = expvar.NewMap("total_responses_sent_by_status")
+// 	)
+// 	// The following code will be run for every request...
+// 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+// 		// Record the time that we started to process the request.
+// 		start := time.Now()
+// 		// Use the Add() method to increment the number of requests received by 1.
+// 		totalRequestsReceived.Add(1)
+// 		// Create a new metricsResponseWriter, which wraps the original
+// 		// http.ResponseWriter value that the metrics middleware received.
+// 		mw := &metricsResponseWriter{ResponseWriter: w}
+// 		// Call the next handler in the chain.
+// 		next.ServeHTTP(mw, r)
+// 		// On the way back up the middleware chain, increment the number of responses
+// 		// sent by 1.
+// 		totalResponsesSent.Add(1)
 
-		// At this point, the response status code should be stored in the
-		// mw.statusCode field. Note that the expvar map is string-keyed, so we
-		// need to use the strconv.Itoa() function to convert the status code
-		// (which is an integer) to a string. Then we use the Add() method on
-		// our new totalResponsesSentByStatus map to increment the count for the
-		// given status code by 1.
-		totalResponsesSentByStatus.Add(strconv.Itoa(mw.statusCode), 1)
-		// Calculate the number of microseconds since we began to process the request,
-		// then increment the total processing time by this amount.
-		duration := time.Since(start).Microseconds()
-		totalProcessingTimeMicroseconds.Add(duration)
-	})
-}
+// 		// At this point, the response status code should be stored in the
+// 		// mw.statusCode field. Note that the expvar map is string-keyed, so we
+// 		// need to use the strconv.Itoa() function to convert the status code
+// 		// (which is an integer) to a string. Then we use the Add() method on
+// 		// our new totalResponsesSentByStatus map to increment the count for the
+// 		// given status code by 1.
+// 		totalResponsesSentByStatus.Add(strconv.Itoa(mw.statusCode), 1)
+// 		// Calculate the number of microseconds since we began to process the request,
+// 		// then increment the total processing time by this amount.
+// 		duration := time.Since(start).Microseconds()
+// 		totalProcessingTimeMicroseconds.Add(duration)
+// 	})
+// }

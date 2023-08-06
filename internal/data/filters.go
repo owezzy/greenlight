@@ -30,7 +30,8 @@ type Metadata struct {
 // and a page size of 5, the last page value would be math.Ceil(12/5) = 3.
 func calculateMetadata(totalRecords, page, pageSize int) Metadata {
 	if totalRecords == 0 {
-		// Note that we return an empty Metadata struct if there are no records. return Metadata{}
+		// Note that we return an empty Metadata struct if there are no records.
+		return Metadata{}
 	}
 	return Metadata{
 		CurrentPage:  page,
