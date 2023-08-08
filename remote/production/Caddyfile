@@ -1,4 +1,4 @@
-http://13.41.78.85 { 
+http://greenlight.owezzy.tech { 
 	respond /debug/* "Not Permitted" 403
 	reverse_proxy localhost:4000
 }
