@@ -15,18 +15,23 @@ func (app *application) createActivationTokenHandler(w http.ResponseWriter, r *h
 		Email string `json:"email"`
 	}
 	err := app.readJSON(w, r, &input)
+
 	if err != nil {
 		app.badRequestResponse(w, r, err)
 		return
 	}
+
 	v := validator.New()
+
 	if data.ValidateEmail(v, input.Email); !v.Valid() {
 		app.failedValidationResponse(w, r, v.Errors)
 		return
 	}
+
 	// Try to retrieve the corresponding user record for the email address. If it can't
 	// be found, return an error message to the client.
 	user, err := app.models.Users.GetByEmail(input.Email)
+
 	if err != nil {
 		switch {
 		case errors.Is(err, data.ErrRecordNotFound):
@@ -45,6 +50,7 @@ func (app *application) createActivationTokenHandler(w http.ResponseWriter, r *h
 	}
 	// Otherwise, create a new activation token.
 	token, err := app.models.Tokens.New(user.ID, 3*24*time.Hour, data.ScopeActivation)
+
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 		return
@@ -64,6 +70,7 @@ func (app *application) createActivationTokenHandler(w http.ResponseWriter, r *h
 	// Send a 202 Accepted response and confirmation message to the client.
 	env := envelope{"message": "an email will be sent to you containing activation instructions"}
 	err = app.writeJSON(w, http.StatusAccepted, env, nil)
+
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 	}
