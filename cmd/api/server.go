@@ -59,7 +59,7 @@ func (app *application) serve() error {
 	}()
 
 	// Likewise log a "starting server" message.
-	app.logger.PrintInfo("starting server", map[string]string{
+	app.logger.PrintInfo("GREEN-LIGHT server Running", map[string]string{
 		"addr": srv.Addr,
 		"env":  app.config.env,
 	})

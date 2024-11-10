@@ -1,2 +1,4 @@
 .envrc
 bin/
+.idea/
+.DS_Store
